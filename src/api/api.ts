@@ -1,4 +1,4 @@
-const API_URL = "http://127.0.0.1:8000/api"
+const API_URL = "https://4e7c-2a03-32c0-2f-24c6-c1e0-afe6-8f85-878d.ngrok-free.app/api";
 
 function getToken() {
   return localStorage.getItem("token")
@@ -156,6 +156,12 @@ export async function getBookings() {
     }
   })
 
+  if (!res.ok) {
+    const text = await res.text()
+    console.error("Bookings API error:", text)
+    throw new Error("Failed to load bookings")
+  }
+
   return await res.json()
 }
 
@@ -172,6 +178,28 @@ export async function cancelBooking(id: number) {
   if (!res.ok) {
     throw new Error("Ошибка отмены")
   }
+}
+
+export async function createReview(data: any) {
+  const token = localStorage.getItem("token")
+
+  const res = await fetch(`${API_URL}/reviews/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Token ${token}`
+    },
+    body: JSON.stringify(data)
+  })
+
+  const text = await res.text()
+
+  if (!res.ok) {
+    console.log("REVIEW ERROR:", text)
+    throw new Error(text)
+  }
+
+  return JSON.parse(text)
 }
 
 export async function updateMe(data: any) {

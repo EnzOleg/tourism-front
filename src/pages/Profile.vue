@@ -131,19 +131,28 @@
                     >
                       Оплатить
                     </button>
+
                     <button
-                      v-if="booking.status !== 'cancelled'"
+                      v-if="booking.status !== 'cancelled' && booking.status !== 'completed'"
                       class="btn-cancel-booking"
                       @click="handleCancel(booking.id)"
                     >
                       Отменить
                     </button>
+
+                  <button
+                    v-if="booking.status === 'completed'"
+                    class="btn-review"
+                    :disabled="!booking.can_review"
+                    @click="openReview(booking)"
+                  >
+                    {{ booking.can_review ? 'Оставить отзыв' : 'Отзыв оставлен' }}
+                  </button>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-
 
           <div v-else class="empty-state">
             <div class="empty-icon">✈️</div>
@@ -178,6 +187,51 @@
               </div>
             </div>
           </div>
+
+          <div
+            v-if="showReviewModal"
+            class="modal-overlay"
+            @click.self="showReviewModal = false"
+          >
+            <div class="modal-content">
+              <h3>Оставить отзыв</h3>
+
+              <div class="form-group">
+                <label>Оценка</label>
+
+                <select v-model="reviewData.rating">
+                  <option :value="5">5 ⭐</option>
+                  <option :value="4">4 ⭐</option>
+                  <option :value="3">3 ⭐</option>
+                  <option :value="2">2 ⭐</option>
+                  <option :value="1">1 ⭐</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Отзыв</label>
+
+                <textarea
+                  v-model="reviewData.comment"
+                  rows="4"
+                  placeholder="Как прошло путешествие?"
+                />
+              </div>
+
+              <div class="modal-actions">
+                <button class="btn-primary" @click="submitReview">
+                  Отправить
+                </button>
+
+                <button
+                  class="btn-secondary"
+                  @click="showReviewModal = false"
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          </div>
       </template>
     </div>
   </div>
@@ -186,7 +240,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMe, getBookings, updateMe, cancelBooking, updateMeAvatar, payBooking } from '../api/api'
+import { getMe, getBookings, updateMe, cancelBooking, updateMeAvatar, payBooking, createReview } from '../api/api'
 import { logout } from '../auth'
 
 const router = useRouter()
@@ -208,6 +262,7 @@ const editForm = ref({
 
 const showPaymentModal = ref(false)
 const currentBookingId = ref<number | null>(null)
+const currentReviewBooking = ref<any>(null)
 const paymentData = ref({
   cardNumber: '',
   expiry: '',
@@ -215,6 +270,46 @@ const paymentData = ref({
 })
 const paymentLoading = ref(false)
 const paymentError = ref('')
+
+const showReviewModal = ref(false)
+
+const reviewData = ref({
+  rating: 5,
+  comment: ''
+})
+
+function openReview(booking: any) {
+  currentReviewBooking.value = booking
+
+  reviewData.value = {
+    rating: 5,
+    comment: ''
+  }
+
+  showReviewModal.value = true
+}
+
+async function submitReview() {
+  try {
+    await createReview({
+      tour: currentReviewBooking.value.tour.id,
+      rating: reviewData.value.rating,
+      text: reviewData.value.comment 
+    })
+
+    bookings.value = bookings.value.map(b =>
+      b.id === currentReviewBooking.value.id
+        ? { ...b, can_review: false }
+        : b
+    )
+
+    showReviewModal.value = false
+
+  } catch (e) {
+    console.error(e)
+    alert('Не удалось отправить отзыв')
+  }
+}
 
 const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString('ru-RU')
@@ -230,6 +325,7 @@ const translateStatus = (status: string) => {
     case 'pending': return 'В ожидании'
     case 'confirmed': return 'Подтверждён'
     case 'cancelled': return 'Отменён'
+    case 'completed' : return 'Выполнен'
     default: return status
   }
 }
@@ -891,5 +987,35 @@ onMounted(async () => {
   .modal-content {
     padding: 24px;
   }
+}
+
+.btn-review {
+  background: #6366f1;
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 40px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-review:hover {
+  transform: scale(1.05);
+}
+
+.review-done {
+  font-size: 0.8rem;
+  color: #10b981;
+  font-weight: 600;
+}
+
+.form-group textarea,
+.form-group select {
+  padding: 12px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 16px;
+  font-size: 1rem;
+  resize: vertical;
 }
 </style>
