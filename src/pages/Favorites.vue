@@ -5,33 +5,49 @@ import { getFavorites, removeFavorite, createBooking } from "../api/api"
 const favorites = ref<any[]>([])
 const bookingError = ref('')
 const bookingTour = ref<any>(null)
+const selectedHotelId = ref<number | null>(null)
 const startDate = ref("")
 const endDate = ref("")
-const bookingLoading = ref(false) // опционально, для индикации загрузки
+const bookingLoading = ref(false)
+const peopleCount = ref(1)
 
 function openBooking(tour: any) {
   bookingTour.value = tour
   bookingError.value = ''
+  selectedHotelId.value = null
   startDate.value = ''
   endDate.value = ''
+  peopleCount.value = 1
 }
 
 async function confirmBooking() {
-  if (!bookingTour.value) return
   bookingError.value = ''
-  bookingLoading.value = true
+
+  if (!selectedHotelId.value) {
+    bookingError.value = 'Выберите отель'
+    return
+  }
+
+  if (!peopleCount.value || peopleCount.value <= 0) {
+    bookingError.value = "Укажите количество людей"
+    return
+  }
+
   try {
     await createBooking(
       bookingTour.value.id,
+      selectedHotelId.value,
       startDate.value,
-      endDate.value
+      endDate.value,
+      peopleCount.value
     )
+
     bookingTour.value = null
+    selectedHotelId.value = null
+
     alert('Бронирование успешно создано!')
   } catch (err: any) {
-    bookingError.value = err.message || 'Ошибка при бронировании'
-  } finally {
-    bookingLoading.value = false
+    bookingError.value = err.message
   }
 }
 
@@ -139,6 +155,36 @@ onMounted(async () => {
           Бронирование: {{ bookingTour.title }}
         </h2>
 
+        <label class="modal-label">Выберите отель</label>
+
+        <div class="booking-hotels">
+          <div
+            v-for="hotel in bookingTour.hotels"
+            :key="hotel.id"
+            class="booking-hotel-card"
+            :class="{ active: selectedHotelId === hotel.id }"
+            @click="selectedHotelId = hotel.id"
+          >
+            <img
+              v-if="hotel.image_url"
+              :src="hotel.image_url"
+              :alt="hotel.name"
+              class="booking-hotel-image"
+            />
+
+            <div v-else class="booking-hotel-placeholder">
+              🏨
+            </div>
+
+            <div class="booking-hotel-info">
+              <h4>{{ hotel.name }}</h4>
+              <p>📍 {{ hotel.city }}</p>
+              <p v-if="hotel.rating">⭐ {{ hotel.rating }}/5</p>
+              <strong>{{ hotel.price_per_night }} ₸ / ночь</strong>
+            </div>
+          </div>
+        </div>
+
         <label class="modal-label">Дата начала</label>
         <input
           type="date"
@@ -188,6 +234,72 @@ onMounted(async () => {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 24px;
+}
+
+.booking-hotels {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.booking-hotel-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 16px;
+  cursor: pointer;
+  background: var(--white);
+  transition: 0.2s ease;
+}
+
+.booking-hotel-card:hover {
+  border-color: var(--blue);
+  transform: translateY(-2px);
+}
+
+.booking-hotel-card.active {
+  border-color: var(--blue);
+  background: #eff6ff;
+}
+
+.booking-hotel-image,
+.booking-hotel-placeholder {
+  width: 96px;
+  height: 80px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--gray-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+.booking-hotel-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.booking-hotel-info h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--gray-900);
+}
+
+.booking-hotel-info p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--gray-500);
+}
+
+.booking-hotel-info strong {
+  color: var(--blue);
+  font-size: 0.95rem;
 }
 
 /* Заголовок страницы */

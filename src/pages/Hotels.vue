@@ -1,11 +1,92 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue"
-import { getHotels } from "../api/api"
+import { ref, onMounted, computed } from "vue"
+import { getHotels, getTours, createBooking } from "../api/api"
 
 const hotels = ref<any[]>([])
+const tours = ref<any[]>([])
+
+const bookingHotel = ref<any>(null)
+const selectedTourId = ref<number | null>(null)
+const startDate = ref("")
+const endDate = ref("")
+const bookingError = ref("")
+const bookingLoading = ref(false)
+const peopleCount = ref(1)
+
+const availableToursForHotel = computed(() => {
+  if (!bookingHotel.value) return []
+
+  return tours.value.filter((tour: any) => {
+    if (!Array.isArray(tour.hotels)) return false
+
+    return tour.hotels.some((hotel: any) => hotel.id === bookingHotel.value.id)
+  })
+})
+
+function openBooking(hotel: any) {
+  bookingHotel.value = hotel
+  selectedTourId.value = null
+  startDate.value = ""
+  endDate.value = ""
+  peopleCount.value = 1
+  bookingError.value = ""
+}
+
+function closeBooking() {
+  bookingHotel.value = null
+  selectedTourId.value = null
+  startDate.value = ""
+  endDate.value = ""
+  peopleCount.value = 1
+  bookingError.value = ""
+}
+
+async function confirmBooking() {
+  bookingError.value = ""
+
+  if (!bookingHotel.value) {
+    bookingError.value = "Отель не выбран"
+    return
+  }
+
+  if (!selectedTourId.value) {
+    bookingError.value = "Выберите тур"
+    return
+  }
+
+  if (!startDate.value || !endDate.value) {
+    bookingError.value = "Выберите даты"
+    return
+  }
+
+  if (!peopleCount.value || peopleCount.value <= 0) {
+    bookingError.value = "Укажите количество людей"
+    return
+  }
+
+  try {
+    bookingLoading.value = true
+
+    await createBooking(
+      selectedTourId.value,
+      bookingHotel.value.id,
+      startDate.value,
+      endDate.value,
+      peopleCount.value
+    )
+
+    closeBooking()
+    alert("Бронирование успешно создано!")
+  } catch (err: any) {
+    bookingError.value = err.message || "Ошибка при бронировании"
+  } finally {
+    bookingLoading.value = false
+  }
+}
 
 onMounted(async () => {
   hotels.value = await getHotels()
+  tours.value = await getTours()
 })
 </script>
 
@@ -56,9 +137,17 @@ onMounted(async () => {
               <div class="hotel-price">
                 {{ hotel.price_per_night }} ₸ <span class="price-unit">/ ночь</span>
               </div>
+
               <div class="hotel-address" v-if="hotel.address">
                 📍 {{ hotel.address }}
               </div>
+
+              <button
+                class="btn-book-hotel"
+                @click="openBooking(hotel)"
+              >
+                Забронировать
+              </button>
             </div>
           </div>
         </div>
@@ -67,6 +156,93 @@ onMounted(async () => {
       <div v-else class="empty-state">
         <div class="empty-icon">🏨</div>
         <p>Отели пока не добавлены</p>
+      </div>
+
+      <div
+        v-if="bookingHotel"
+        class="modal-overlay"
+        @click.self="closeBooking"
+      >
+        <div class="modal-content">
+          <h2 class="modal-title">
+            Бронирование отеля: {{ bookingHotel.name }}
+          </h2>
+
+          <p class="modal-subtitle">
+            Выберите тур, в рамках которого хотите забронировать этот отель.
+          </p>
+
+          <div v-if="availableToursForHotel.length" class="form-group">
+            <label>Тур</label>
+
+            <select v-model.number="selectedTourId" class="modal-input">
+              <option :value="null" disabled>
+                Выберите тур
+              </option>
+
+              <option
+                v-for="tour in availableToursForHotel"
+                :key="tour.id"
+                :value="tour.id"
+              >
+                {{ tour.title }} — {{ tour.city }} — {{ tour.duration_days }} дней
+              </option>
+            </select>
+          </div>
+
+          <div v-else class="error-message">
+            Для этого отеля пока нет доступных туров
+          </div>
+
+          <div class="form-group">
+            <label>Дата начала</label>
+            <input
+              type="date"
+              v-model="startDate"
+              class="modal-input"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Дата окончания</label>
+            <input
+              type="date"
+              v-model="endDate"
+              class="modal-input"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Количество людей</label>
+            <input
+              type="number"
+              min="1"
+              v-model.number="peopleCount"
+              class="modal-input"
+            />
+          </div>
+
+          <div v-if="bookingError" class="error-message">
+            {{ bookingError }}
+          </div>
+
+          <div class="modal-actions">
+          <button
+            class="btn-primary"
+            :disabled="bookingLoading || !selectedTourId || !startDate || !endDate || !peopleCount || peopleCount <= 0 || !availableToursForHotel.length"
+            @click="confirmBooking"
+          >
+            {{ bookingLoading ? "Бронирование..." : "Подтвердить" }}
+          </button>
+
+            <button
+              class="btn-secondary"
+              @click="closeBooking"
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -263,7 +439,165 @@ onMounted(async () => {
   margin-bottom: 24px;
 }
 
-/* Адаптивность */
+.btn-book-hotel {
+  width: 100%;
+  margin-top: 14px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 14px;
+  background: var(--blue);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.btn-book-hotel:hover {
+  background: var(--blue-dark);
+  transform: translateY(-1px);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.modal-content {
+  width: 100%;
+  max-width: 460px;
+  background: white;
+  border-radius: 24px;
+  padding: 28px;
+  box-shadow: 0 25px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin: 0 0 8px;
+}
+
+.modal-subtitle {
+  font-size: 0.95rem;
+  color: var(--gray-500);
+  line-height: 1.5;
+  margin: 0 0 18px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--gray-700);
+}
+
+.modal-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--gray-300);
+  border-radius: 14px;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.modal-input:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.error-message {
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.btn-primary,
+.btn-secondary {
+  flex: 1;
+  padding: 12px 18px;
+  border-radius: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--blue);
+  color: white;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+}
+
+@media (max-width: 640px) {
+  .hotels-page {
+    padding: 32px 0;
+  }
+
+  .container {
+    padding: 0 16px;
+  }
+
+  .page-title {
+    font-size: 1.4rem;
+    margin-bottom: 28px;
+  }
+
+  .hotels-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .hotel-card:hover {
+    transform: none;
+  }
+
+  .modal-content {
+    padding: 22px 18px;
+    border-radius: 20px;
+  }
+
+  .modal-title {
+    font-size: 1.2rem;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+}
+
 @media (max-width: 640px) {
   .page-title {
     font-size: 1.5rem;

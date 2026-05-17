@@ -21,10 +21,17 @@ async function handleLogin() {
   error.value = ""
 
   try {
-    await login(username.value, password.value)
+    const data = await login(username.value, password.value)
+
+    if (!data.token) {
+      throw new Error("Token not received")
+    }
+
     isAuthenticated.value = true
     router.push("/")
   } catch (err) {
+    isAuthenticated.value = false
+    localStorage.removeItem("token")
     error.value = "Неверное имя пользователя или пароль"
   } finally {
     loading.value = false
@@ -86,33 +93,32 @@ async function handleLogin() {
 </template>
 
 <style scoped>
-/* Переопределяем глобальный .container только для этой страницы */
-.login-page .container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 150px 20px; /* убираем вертикальные отступы, оставляем только боковые */
-  width: 100%;
+.login-page {
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+  min-height: 100vh;
   display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  max-height: 100vh; /* занимает всю высоту экрана */
+  padding: 48px 16px;
+  box-sizing: border-box;
 }
 
-.login-page {
-  background-color: #ffffff;
-  max-height: 100vh;
-  display: flex;
-  align-items: center; /* дополнительная страховка */
+/* Переопределяем глобальный .container только для этой страницы */
+.login-page .container {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0;
 }
 
 .page-title {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 12px;
-  padding-left: 480px;
   font-size: 2rem;
   font-weight: 600;
-  margin-bottom: 40px;
+  margin: 0 0 28px;
   color: #111827;
 }
 
@@ -121,16 +127,17 @@ async function handleLogin() {
   height: 40px;
   background-color: #3b82f6;
   border-radius: 4px;
+  flex-shrink: 0;
 }
 
 .login-card {
-  max-width: 420px;
-  margin: 0 auto;
+  width: 100%;
   background: #ffffff;
   border-radius: 24px;
   padding: 32px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04);
   border: 1px solid rgba(0, 0, 0, 0.02);
+  box-sizing: border-box;
 }
 
 .login-form {
@@ -152,6 +159,8 @@ async function handleLogin() {
 }
 
 .form-input {
+  width: 100%;
+  box-sizing: border-box;
   padding: 12px 16px;
   border-radius: 40px;
   border: 1px solid #d1d5db;
@@ -172,6 +181,7 @@ async function handleLogin() {
 }
 
 .btn-primary {
+  width: 100%;
   background-color: #3b82f6;
   color: white;
   border: none;
@@ -212,6 +222,7 @@ async function handleLogin() {
   margin-top: 24px;
   font-size: 0.95rem;
   color: #6b7280;
+  line-height: 1.5;
 }
 
 .link {
@@ -238,15 +249,77 @@ async function handleLogin() {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-@media (max-width: 480px) {
-  .page-title {
-    font-size: 1.5rem;
+/* Планшеты */
+@media (max-width: 768px) {
+  .login-page {
+    padding: 40px 18px;
   }
+
+  .page-title {
+    font-size: 1.75rem;
+    margin-bottom: 24px;
+  }
+
   .login-card {
-    padding: 24px;
+    padding: 28px;
+  }
+}
+
+/* Телефоны */
+@media (max-width: 480px) {
+  .login-page {
+    align-items: flex-start;
+    padding: 32px 14px;
+  }
+
+  .page-title {
+    font-size: 1.4rem;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .title-accent {
+    width: 6px;
+    height: 32px;
+  }
+
+  .login-card {
+    padding: 22px 18px;
+    border-radius: 20px;
+  }
+
+  .login-form {
+    gap: 16px;
+  }
+
+  .form-input {
+    padding: 12px 14px;
+    font-size: 0.95rem;
+  }
+
+  .btn-primary {
+    padding: 12px 18px;
+    font-size: 0.95rem;
+  }
+
+  .register-link {
+    font-size: 0.9rem;
+  }
+}
+
+/* Очень маленькие экраны */
+@media (max-width: 360px) {
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .login-card {
+    padding: 20px 14px;
   }
 }
 </style>

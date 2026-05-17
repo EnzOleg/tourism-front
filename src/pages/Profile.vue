@@ -115,11 +115,21 @@
                 <p v-if="booking.tour?.city" class="tour-city">
                   📍 {{ booking.tour.city }}
                 </p>
-                <p class="booking-dates">
-                  🗓️ {{ formatDate(booking.start_date) }} — {{ formatDate(booking.end_date) }}
+                <p
+                  v-if="booking.refund_message"
+                  class="refund-message"
+                >
+                  💸 {{ booking.refund_message }}
                 </p>
                 <p class="tour-description" v-if="booking.tour?.description">
                   {{ truncate(booking.tour.description, 80) }}
+                </p>
+                <p class="booking-dates">
+                  🗓️ {{ formatDate(booking.start_date) }} — {{ formatDate(booking.end_date) }}
+                </p>
+
+                <p class="booking-people">
+                  👥 Количество людей: {{ booking.people_count }}
                 </p>
                 <div class="card-footer">
                   <p class="price">₸{{ booking.total_price }}</p>
@@ -140,14 +150,21 @@
                       Отменить
                     </button>
 
-                  <button
-                    v-if="booking.status === 'completed'"
-                    class="btn-review"
-                    :disabled="!booking.can_review"
-                    @click="openReview(booking)"
-                  >
-                    {{ booking.can_review ? 'Оставить отзыв' : 'Отзыв оставлен' }}
-                  </button>
+                    <button
+                      v-if="booking.status === 'completed'"
+                      class="btn-review"
+                      :disabled="!booking.can_review"
+                      @click="openReview(booking)"
+                    >
+                      {{ booking.can_review ? 'Оставить отзыв' : 'Отзыв оставлен' }}
+                    </button>
+
+                    <button
+                      class="btn-delete-booking"
+                      @click="handleDeleteBooking(booking.id)"
+                    >
+                      Удалить
+                    </button>
                   </div>
                 </div>
               </div>
@@ -173,7 +190,7 @@
                   <label>Срок (MM/YY)</label>
                   <input v-model="paymentData.expiry" placeholder="MM/YY" />
                 </div>
-                <div class="form-group half">
+                <div class="form-group-half-cvv">
                   <label>CVV</label>
                   <input v-model="paymentData.cvv" placeholder="123" type="password" />
                 </div>
@@ -240,7 +257,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMe, getBookings, updateMe, cancelBooking, updateMeAvatar, payBooking, createReview } from '../api/api'
+import { getMe, getBookings, updateMe, cancelBooking, deleteBooking, updateMeAvatar, payBooking, createReview } from '../api/api'
 import { logout } from '../auth'
 
 const router = useRouter()
@@ -390,12 +407,27 @@ const saveProfile = async () => {
 
 const handleCancel = async (id: number) => {
   try {
-    await cancelBooking(id)
+    const updatedBooking = await cancelBooking(id)
+
     bookings.value = bookings.value.map(b =>
-      b.id === id ? { ...b, status: 'cancelled' } : b
+      b.id === id ? updatedBooking : b
     )
+  } catch (e: any) {
+    alert(e.message || 'Не удалось отменить бронирование')
+  }
+}
+
+const handleDeleteBooking = async (id: number) => {
+  const confirmed = confirm("Удалить эту запись из профиля?")
+
+  if (!confirmed) return
+
+  try {
+    await deleteBooking(id)
+
+    bookings.value = bookings.value.filter(b => b.id !== id)
   } catch (e) {
-    alert('Не удалось отменить бронирование')
+    alert("Не удалось удалить запись")
   }
 }
 
@@ -644,7 +676,7 @@ onMounted(async () => {
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
 }
 .form-group label {
   font-size: 0.9rem;
@@ -653,6 +685,7 @@ onMounted(async () => {
 }
 .form-group input {
   padding: 12px 16px;
+  width: 260px;
   border: 1px solid var(--gray-300);
   border-radius: 40px;
   font-size: 1rem;
@@ -668,7 +701,19 @@ onMounted(async () => {
   gap: 12px;
   margin-top: 8px;
 }
-
+.form-group-half-cvv input {
+  padding: 12px 16px;
+  width: 60px;
+  border: 1px solid var(--gray-300);
+  border-radius: 40px;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-group-half-cvv input:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
 /* ===== Универсальные кнопки ===== */
 .btn-primary {
   background: var(--blue);
@@ -711,6 +756,30 @@ onMounted(async () => {
   transform: translateY(0);
 }
 
+.btn-cancel {
+  background: var(--gray-100);
+  color: var(--gray-600);
+  border: 1px solid var(--gray-300);
+
+  padding: 12px 24px;
+  border-radius: 40px;
+
+  font-weight: 500;
+  cursor: pointer;
+
+  transition: all 0.2s ease;
+}
+
+.btn-cancel:hover {
+  background: var(--gray-200);
+  border-color: var(--gray-400);
+  color: var(--gray-700);
+}
+
+.btn-cancel:active {
+  transform: translateY(1px);
+  background: var(--gray-300);
+}
 /* ===== Бронирования ===== */
 .bookings-section {
   margin-top: 32px;
@@ -798,6 +867,11 @@ onMounted(async () => {
   gap: 6px;
   margin: 0;
 }
+.booking-people {
+  font-size: 0.9rem;
+  color: var(--gray-500);
+  margin: 0;
+}
 .tour-description {
   font-size: 0.9rem;
   color: var(--gray-700);
@@ -810,8 +884,9 @@ onMounted(async () => {
 }
 .card-footer {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--gray-100);
@@ -1017,5 +1092,200 @@ onMounted(async () => {
   border-radius: 16px;
   font-size: 1rem;
   resize: vertical;
+}
+
+.refund-message {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.btn-delete-booking {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.btn-delete-booking:hover {
+  background: #fecaca;
+}
+
+@media (max-width: 768px) {
+  .profile-page {
+    padding: 32px 0;
+  }
+
+  .container {
+    padding: 0 16px;
+  }
+
+  .profile-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 24px;
+    gap: 20px;
+    border-radius: 24px;
+  }
+
+  .info-section {
+    width: 100%;
+  }
+
+  .info-view {
+    align-items: center;
+  }
+
+  .username {
+    font-size: 1.6rem;
+    word-break: break-word;
+  }
+
+  .email {
+    word-break: break-word;
+  }
+
+  .action-buttons {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn-outline {
+    flex: 1 1 180px;
+    justify-content: center;
+  }
+
+  .bookings-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .booking-card:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-page {
+    padding: 24px 0;
+  }
+
+  .container {
+    padding: 0 12px;
+  }
+
+  .page-title,
+  .section-title {
+    font-size: 1.35rem;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .title-accent {
+    width: 6px;
+    height: 30px;
+  }
+
+  .profile-card {
+    padding: 20px 16px;
+    border-radius: 20px;
+  }
+
+  .avatar-wrapper {
+    width: 110px;
+    height: 110px;
+  }
+
+  .avatar-placeholder {
+    font-size: 2.4rem;
+  }
+
+  .username {
+    font-size: 1.4rem;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .btn-outline {
+    width: 100%;
+    flex: none;
+  }
+
+  .bookings-section {
+    margin-top: 24px;
+  }
+
+  .bookings-grid {
+    gap: 16px;
+  }
+
+  .card-image {
+    height: 160px;
+  }
+
+  .card-content {
+    padding: 16px;
+  }
+
+  .tour-title {
+    font-size: 1.1rem;
+  }
+
+  .tour-description {
+    -webkit-line-clamp: 3;
+  }
+
+  .card-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .btn-pay,
+  .btn-cancel-booking,
+  .btn-review,
+  .btn-delete-booking {
+    min-height: 42px;
+    font-size: 0.9rem;
+  }
+  .modal-overlay {
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+
+  .modal-content {
+    width: 100%;
+    max-width: 420px;
+    border-radius: 24px;
+    padding: 24px 18px;
+    max-height: 88vh;
+    overflow-y: auto;
+    transform: translateY(-10px);
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .form-row {
+    flex-direction: column;
+  }
+
+  .form-group input,
+  .form-group-half-cvv input {
+    width: 100%;
+    box-sizing: border-box;
+  }
 }
 </style>

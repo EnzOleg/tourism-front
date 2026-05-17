@@ -96,35 +96,33 @@ async function handleRegister() {
     </div>
   </div>
 </template>
-
 <style scoped>
-/* Переопределяем глобальный .container только для этой страницы */
-.register-page .container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 150px 20px;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  max-height: 100vh;
-}
-
 .register-page {
-  background-color: #ffffff;
-  max-height: 100vh;
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+  min-height: 100vh;
   display: flex;
   align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+  box-sizing: border-box;
+}
+
+/* Переопределяем глобальный .container только для этой страницы */
+.register-page .container {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0;
 }
 
 .page-title {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 12px;
   font-size: 2rem;
-  padding-left: 480px;
   font-weight: 600;
-  margin-bottom: 40px;
+  margin: 0 0 28px;
   color: #111827;
 }
 
@@ -133,16 +131,17 @@ async function handleRegister() {
   height: 40px;
   background-color: #3b82f6;
   border-radius: 4px;
+  flex-shrink: 0;
 }
 
 .register-card {
-  max-width: 420px;
-  margin: 0 auto;
+  width: 100%;
   background: #ffffff;
   border-radius: 24px;
   padding: 32px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04);
   border: 1px solid rgba(0, 0, 0, 0.02);
+  box-sizing: border-box;
 }
 
 .register-form {
@@ -164,6 +163,8 @@ async function handleRegister() {
 }
 
 .form-input {
+  width: 100%;
+  box-sizing: border-box;
   padding: 12px 16px;
   border-radius: 40px;
   border: 1px solid #d1d5db;
@@ -184,6 +185,7 @@ async function handleRegister() {
 }
 
 .btn-primary {
+  width: 100%;
   background-color: #3b82f6;
   color: white;
   border: none;
@@ -224,6 +226,7 @@ async function handleRegister() {
   margin-top: 24px;
   font-size: 0.95rem;
   color: #6b7280;
+  line-height: 1.5;
 }
 
 .link {
@@ -250,15 +253,77 @@ async function handleRegister() {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-@media (max-width: 480px) {
-  .page-title {
-    font-size: 1.5rem;
+/* Планшеты */
+@media (max-width: 768px) {
+  .register-page {
+    padding: 40px 18px;
   }
+
+  .page-title {
+    font-size: 1.75rem;
+    margin-bottom: 24px;
+  }
+
   .register-card {
-    padding: 24px;
+    padding: 28px;
+  }
+}
+
+/* Телефоны */
+@media (max-width: 480px) {
+  .register-page {
+    align-items: flex-start;
+    padding: 32px 14px;
+  }
+
+  .page-title {
+    font-size: 1.4rem;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .title-accent {
+    width: 6px;
+    height: 32px;
+  }
+
+  .register-card {
+    padding: 22px 18px;
+    border-radius: 20px;
+  }
+
+  .register-form {
+    gap: 16px;
+  }
+
+  .form-input {
+    padding: 12px 14px;
+    font-size: 0.95rem;
+  }
+
+  .btn-primary {
+    padding: 12px 18px;
+    font-size: 0.95rem;
+  }
+
+  .login-link {
+    font-size: 0.9rem;
+  }
+}
+
+/* Очень маленькие экраны */
+@media (max-width: 360px) {
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .register-card {
+    padding: 20px 14px;
   }
 }
 </style>

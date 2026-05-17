@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue"
 import { getTours, addFavorite, removeFavorite, getFavorites, createBooking } from "../api/api"
+import ManagerContactWidget from "../components/ManagerContactWidget.vue"
 
 const tours = ref<any[]>([])
 
@@ -10,11 +11,13 @@ const favorites = ref<number[]>([])
 
 const bookingError = ref('')
 const bookingTour = ref<any>(null)
+const selectedHotelId = ref<number | null>(null)
 const startDate = ref("")
 const endDate = ref("")
 const search = ref("")
 const maxPrice = ref<number | null>(null)
 const minPrice = ref<number | null>(null)
+const peopleCount = ref(1)
 
 const filteredTours = computed(() => {
   return tours.value.filter(t => {
@@ -55,22 +58,40 @@ function isFavorite(tourId: number) {
 function openBooking(tour: any) {
   bookingTour.value = tour
   bookingError.value = ''
+  selectedHotelId.value = null
   startDate.value = ''
   endDate.value = ''
+  peopleCount.value = 1
 }
 
 async function confirmBooking() {
   bookingError.value = ''
+
+  if (!selectedHotelId.value) {
+    bookingError.value = 'Выберите отель'
+    return
+  }
+
+  if (!peopleCount.value || peopleCount.value <= 0) {
+    bookingError.value = "Укажите количество людей"
+    return
+  }
+
   try {
     await createBooking(
       bookingTour.value.id,
+      selectedHotelId.value,
       startDate.value,
-      endDate.value
+      endDate.value,
+      peopleCount.value
     )
+
     bookingTour.value = null
+    selectedHotelId.value = null
+
     alert('Бронирование успешно создано!')
   } catch (err: any) {
-    bookingError.value = err.message 
+    bookingError.value = err.message
   }
 }
 
@@ -173,6 +194,12 @@ onMounted(async () => {
           >
             {{ isFavorite(tour.id) ? 'В избранном ❤️' : 'В избранное' }}
           </button>
+          <router-link
+            :to="`/tours/${tour.id}`"
+            class="btn-secondary details-link"
+          >
+            Подробнее
+          </router-link>
         </div>
       </div>
     </div>
@@ -184,6 +211,36 @@ onMounted(async () => {
           <span class="title-accent"></span>
           Бронирование: {{ bookingTour.title }}
         </h2>
+
+        <label class="modal-label">Выберите отель</label>
+
+        <div class="booking-hotels">
+          <div
+            v-for="hotel in bookingTour.hotels"
+            :key="hotel.id"
+            class="booking-hotel-card"
+            :class="{ active: selectedHotelId === hotel.id }"
+            @click="selectedHotelId = hotel.id"
+          >
+            <img
+              v-if="hotel.image_url"
+              :src="hotel.image_url"
+              :alt="hotel.name"
+              class="booking-hotel-image"
+            />
+
+            <div v-else class="booking-hotel-placeholder">
+              🏨
+            </div>
+
+            <div class="booking-hotel-info">
+              <h4>{{ hotel.name }}</h4>
+              <p>📍 {{ hotel.city }}</p>
+              <p v-if="hotel.rating">⭐ {{ hotel.rating }}/5</p>
+              <strong>{{ hotel.price_per_night }} ₸ / ночь</strong>
+            </div>
+          </div>
+        </div>
 
         <label class="modal-label">Дата начала</label>
         <input
@@ -199,18 +256,26 @@ onMounted(async () => {
           class="modal-input"
         />
 
+        <label class="modal-label">Количество людей</label>
+        <input
+          type="number"
+          min="1"
+          v-model.number="peopleCount"
+          class="modal-input"
+        />
+
         <div v-if="bookingError" class="error-message">
           {{ bookingError }}
         </div>
 
         <div class="modal-actions">
-          <button
-            class="btn-primary"
-            :disabled="!startDate || !endDate"
-            @click="confirmBooking"
-          >
-            Подтвердить бронирование
-          </button>
+        <button
+          class="btn-primary"
+          :disabled="!selectedHotelId || !startDate || !endDate || !peopleCount || peopleCount <= 0"
+          @click="confirmBooking" 
+        >
+          Подтвердить бронирование
+        </button>
           <button
             class="btn-secondary"
             @click="bookingTour = null"
@@ -221,6 +286,7 @@ onMounted(async () => {
       </div>
     </div>
   </div>
+  <ManagerContactWidget />
 </template>
 
 <style scoped>
@@ -274,6 +340,72 @@ onMounted(async () => {
   opacity: 0.95;
   line-height: 1.6;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.booking-hotels {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.booking-hotel-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 16px;
+  cursor: pointer;
+  background: var(--white);
+  transition: 0.2s ease;
+}
+
+.booking-hotel-card:hover {
+  border-color: var(--blue);
+  transform: translateY(-2px);
+}
+
+.booking-hotel-card.active {
+  border-color: var(--blue);
+  background: #eff6ff;
+}
+
+.booking-hotel-image,
+.booking-hotel-placeholder {
+  width: 96px;
+  height: 80px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--gray-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+.booking-hotel-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.booking-hotel-info h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--gray-900);
+}
+
+.booking-hotel-info p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--gray-500);
+}
+
+.booking-hotel-info strong {
+  color: var(--blue);
+  font-size: 0.95rem;
 }
 
 /* ===== Заголовок секции с боковым акцентом ===== */
@@ -442,6 +574,16 @@ onMounted(async () => {
   cursor: pointer;
   transition: background-color 0.2s ease, border-color 0.2s ease;
   flex: 1 1 auto;
+}
+
+.details-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+  box-sizing: border-box;
+  min-height: 42px;
 }
 
 .btn-secondary:hover {

@@ -1,7 +1,14 @@
-const API_URL = "https://4e7c-2a03-32c0-2f-24c6-c1e0-afe6-8f85-878d.ngrok-free.app/api";
+const API_URL = "https://rev-busy-downloading-decision.trycloudflare.com/api";
 
 function getToken() {
-  return localStorage.getItem("token")
+  const token = localStorage.getItem("token")
+
+  if (!token || token === "undefined" || token === "null") {
+    localStorage.removeItem("token")
+    return null
+  }
+
+  return token
 }
 
 export async function getTours() {
@@ -14,6 +21,42 @@ export async function getHotels() {
   return await res.json()
 }
 
+export async function createSupportRequest(data: {
+  name: string
+  phone: string
+  message?: string
+}) {
+  const res = await fetch(`${API_URL}/support-requests/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(data)
+  })
+
+  const responseData = await res.json()
+
+  if (!res.ok) {
+    let message = "Не удалось отправить заявку"
+
+    if (responseData.name) {
+      message = Array.isArray(responseData.name)
+        ? responseData.name[0]
+        : responseData.name
+    } else if (responseData.phone) {
+      message = Array.isArray(responseData.phone)
+        ? responseData.phone[0]
+        : responseData.phone
+    } else if (responseData.detail) {
+      message = responseData.detail
+    }
+
+    throw new Error(message)
+  }
+
+  return responseData
+}
+
 export async function login(username: string, password: string) {
   const res = await fetch(`${API_URL}/auth/login/`, {
     method: "POST",
@@ -24,6 +67,16 @@ export async function login(username: string, password: string) {
   })
 
   const data = await res.json()
+
+  if (!res.ok) {
+    localStorage.removeItem("token")
+    throw new Error(data.error || "Login failed")
+  }
+
+  if (!data.token) {
+    localStorage.removeItem("token")
+    throw new Error("Token not received")
+  }
 
   localStorage.setItem("token", data.token)
 
@@ -43,11 +96,21 @@ export async function register(username: string, email: string, password: string
     })
   })
 
-  return await res.json()
+  const data = await res.json()
+
+  if (!res.ok) {
+    throw new Error(data.error || "Register failed")
+  }
+
+  return data
 }
 
 export async function getMe() {
   const token = getToken()
+
+  if (!token) {
+    throw new Error("No token")
+  }
 
   const res = await fetch(`${API_URL}/me/`, {
     headers: {
@@ -55,12 +118,14 @@ export async function getMe() {
     }
   })
 
-  if (res.status === 401) {
+  const data = await res.json()
+
+  if (!res.ok) {
     localStorage.removeItem("token")
-    throw new Error("Unauthorized")
+    throw new Error(data.detail || "Unauthorized")
   }
 
-  return await res.json()
+  return data
 }
 
 export async function addFavorite(tourId: number) {
@@ -111,10 +176,16 @@ export async function removeFavorite(id: number) {
 
 export async function createBooking(
   tourId: number,
+  hotelId: number,
   startDate: string,
-  endDate: string
+  endDate: string,
+  peopleCount: number
 ) {
-  const token = localStorage.getItem("token")
+  const token = getToken()
+
+  if (!token) {
+    throw new Error("Вы не авторизованы")
+  }
 
   const res = await fetch(`${API_URL}/bookings/`, {
     method: "POST",
@@ -123,28 +194,52 @@ export async function createBooking(
       Authorization: `Token ${token}`
     },
     body: JSON.stringify({
-      tour_id: tourId,          // обязательно tour_id
+      tour_id: tourId,
+      hotel_id: hotelId,
       start_date: startDate,
       end_date: endDate,
+      people_count: peopleCount
     })
   })
 
   const data = await res.json()
+
   if (!res.ok) {
-    // Обработка ошибки, как раньше
-    let errorMessage = ''
+    let errorMessage = ""
+
     if (data.non_field_errors && data.non_field_errors.length) {
       errorMessage = data.non_field_errors[0]
     } else if (data.detail) {
       errorMessage = data.detail
-    } else if (typeof data === 'string') {
+    } else if (typeof data === "string") {
       errorMessage = data
     } else {
       errorMessage = JSON.stringify(data)
     }
+
     throw new Error(errorMessage)
   }
+
   return data
+}
+
+export async function deleteBooking(id: number) {
+  const token = getToken()
+
+  if (!token) {
+    throw new Error("Вы не авторизованы")
+  }
+
+  const res = await fetch(`${API_URL}/bookings/${id}/`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Token ${token}`
+    }
+  })
+
+  if (!res.ok) {
+    throw new Error("Не удалось удалить бронирование")
+  }
 }
 
 export async function getBookings() {
@@ -166,7 +261,11 @@ export async function getBookings() {
 }
 
 export async function cancelBooking(id: number) {
-  const token = localStorage.getItem("token")
+  const token = getToken()
+
+  if (!token) {
+    throw new Error("Вы не авторизованы")
+  }
 
   const res = await fetch(`${API_URL}/bookings/${id}/cancel/`, {
     method: "POST",
@@ -175,9 +274,13 @@ export async function cancelBooking(id: number) {
     }
   })
 
+  const data = await res.json()
+
   if (!res.ok) {
-    throw new Error("Ошибка отмены")
+    throw new Error(data.error || "Ошибка отмены")
   }
+
+  return data
 }
 
 export async function createReview(data: any) {
